@@ -116,6 +116,7 @@ export default function Home() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Entrando..." : "Entrar"}
               </Button>
+              <p className="flex itens-center">&copy; 2025 - Looppa Lab Tech</p>
             </form>
           </CardContent>
         </Card>

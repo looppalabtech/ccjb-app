@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,8 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Trash2, RotateCcw } from "lucide-react"
-import { useState } from "react"
+import { Trash2, Clock, AlertCircle, Check, RotateCcw, Trash } from "lucide-react"
 
 interface User {
   id: string
@@ -30,7 +30,7 @@ interface Task {
   id: string
   titulo: string
   descricao?: string
-  status: "nova" | "em_andamento" | "concluida" | "arquivada" | "trash"
+  status: "nova" | "em_andamento" | "concluida" | "arquivada" | "lixeira"
   priority: "low" | "medium" | "high"
   due_date: string
   assigned_to: string | null
@@ -47,6 +47,7 @@ interface TrashTasksModalProps {
   tasks: Task[]
   onRestoreTask: (taskId: string) => void
   onDeletePermanently: (taskId: string) => void
+  onEmptyTrash: () => void
 }
 
 export default function TrashTasksModal({
@@ -55,9 +56,24 @@ export default function TrashTasksModal({
   tasks,
   onRestoreTask,
   onDeletePermanently,
+  onEmptyTrash,
 }: TrashTasksModalProps) {
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
-  const trashTasks = tasks.filter((task) => task.status === "trash")
+  const [showEmptyTrashDialog, setShowEmptyTrashDialog] = useState(false)
+
+  // 3. Filtrar tarefas com status "lixeira"
+  const trashTasks = tasks.filter((task) => task.status === "lixeira")
+
+  const getStatusIcon = (status: Task["status"]) => {
+    switch (status) {
+      case "concluida":
+        return <Check className="h-4 w-4" />
+      case "em_andamento":
+        return <Clock className="h-4 w-4" />
+      default:
+        return <AlertCircle className="h-4 w-4" />
+    }
+  }
 
   const getPriorityColor = (priority: Task["priority"]) => {
     switch (priority) {
@@ -81,7 +97,7 @@ export default function TrashTasksModal({
     }
   }
 
-  const handleDeletePermanently = (task: Task) => {
+  const handleDeleteClick = (task: Task) => {
     setTaskToDelete(task)
   }
 
@@ -92,14 +108,32 @@ export default function TrashTasksModal({
     }
   }
 
+  const handleEmptyTrash = () => {
+    setShowEmptyTrashDialog(true)
+  }
+
+  const confirmEmptyTrash = () => {
+    onEmptyTrash()
+    setShowEmptyTrashDialog(false)
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[700px] max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Trash2 className="h-5 w-5 mr-2" />
-              Lixeira
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Trash2 className="h-5 w-5 mr-2" />
+                Lixeira
+              </div>
+              {/* 3. Botão para esvaziar lixeira */}
+              {trashTasks.length > 0 && (
+                <Button size="sm" onClick={handleEmptyTrash} className="bg-red-600 hover:bg-red-700 text-white">
+                  <Trash className="h-4 w-4 mr-1" />
+                  Esvaziar Lixeira
+                </Button>
+              )}
             </DialogTitle>
             <DialogDescription>
               Visualize tarefas na lixeira. Você pode restaurá-las ou excluí-las permanentemente.
@@ -115,11 +149,11 @@ export default function TrashTasksModal({
             ) : (
               <div className="space-y-4">
                 {trashTasks.map((task) => (
-                  <Card key={task.id} className="hover:shadow-md transition-shadow border-red-200">
+                  <Card key={task.id} className="hover:shadow-md transition-shadow">
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1 flex-1">
-                          <CardTitle className="text-base text-gray-600">{task.titulo}</CardTitle>
+                          <CardTitle className="text-base">{task.titulo}</CardTitle>
                           {task.descricao && <CardDescription className="text-sm">{task.descricao}</CardDescription>}
                         </div>
                         <div className="flex gap-2 ml-4">
@@ -127,9 +161,12 @@ export default function TrashTasksModal({
                             <RotateCcw className="h-4 w-4 mr-1" />
                             Restaurar
                           </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleDeletePermanently(task)}>
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Excluir
+                          <Button
+                            size="sm"
+                            onClick={() => handleDeleteClick(task)}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -137,7 +174,9 @@ export default function TrashTasksModal({
                     <CardContent className="pt-0">
                       <div className="flex items-center space-x-2 mb-2">
                         <Badge className={getPriorityColor(task.priority)}>{getPriorityText(task.priority)}</Badge>
-                        <Badge variant="destructive">Na Lixeira</Badge>
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          Na Lixeira
+                        </Badge>
                       </div>
                       <div className="text-sm text-gray-500 mb-2">
                         Prazo: {new Date(task.due_date).toLocaleDateString("pt-BR")}
@@ -168,19 +207,39 @@ export default function TrashTasksModal({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Confirmation Dialog for Permanent Delete */}
       <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Permanentemente</AlertDialogTitle>
+            <AlertDialogTitle>Excluir Tarefa Permanentemente</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir permanentemente esta tarefa? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir permanentemente a tarefa "{taskToDelete?.titulo}"? Esta ação não pode ser
+              desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
               Excluir Permanentemente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirmation Dialog for Empty Trash */}
+      <AlertDialog open={showEmptyTrashDialog} onOpenChange={setShowEmptyTrashDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Esvaziar Lixeira</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja esvaziar a lixeira? Todas as {trashTasks.length} tarefas serão excluídas
+              permanentemente. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmEmptyTrash} className="bg-red-600 hover:bg-red-700">
+              Esvaziar Lixeira
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

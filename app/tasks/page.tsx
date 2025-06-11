@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Plus, ArrowLeft, Edit, Trash2, Clock, AlertCircle, Check, Archive } from "lucide-react"
+import { Plus, ArrowLeft, Edit, Trash2, Clock, AlertCircle, Check, Archive, Eye, LogOut } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
@@ -19,10 +19,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { getTasks, createTask, updateTask, deleteTask, getUsers } from "@/lib/supabase"
+import { getTasks, createTask, updateTask, deleteTask, getUsers, emptyTrash } from "@/lib/supabase"
 import TaskCreateModal from "@/components/task-create-modal"
 import ArchivedTasksModal from "@/components/archived-tasks-modal"
 import TrashTasksModal from "@/components/trash-tasks-modal"
+import TaskDetailView from "@/components/task-detail-view"
+import Link from "next/link"
 
 interface UserType {
   id: string
@@ -55,7 +57,7 @@ interface CreateTaskData {
 }
 
 export default function TasksPage() {
-  const { user, profile } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [users, setUsers] = useState<UserType[]>([])
@@ -64,6 +66,8 @@ export default function TasksPage() {
   const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false)
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [isDetailViewOpen, setIsDetailViewOpen] = useState(false)
 
   useEffect(() => {
     loadTasks()
@@ -159,9 +163,36 @@ export default function TasksPage() {
     }
   }
 
+  const handleViewDetails = (task: Task) => {
+    setSelectedTask(task)
+    setIsDetailViewOpen(true)
+  }
+
+  // 3. Função para esvaziar lixeira
+  const handleEmptyTrash = async () => {
+    try {
+      const { error } = await emptyTrash()
+
+      if (error) {
+        console.error("Erro ao esvaziar lixeira:", error)
+        return
+      }
+
+      // Remover tarefas da lixeira do estado local
+      setTasks(tasks.filter((task) => task.status !== "lixeira"))
+    } catch (error) {
+      console.error("Erro inesperado ao esvaziar lixeira:", error)
+    }
+  }
+
   // Filtrar tarefas por status (excluindo arquivadas e lixeira)
   const activeTasks = tasks.filter((task) => !["arquivada", "lixeira"].includes(task.status))
-  const newTasks = activeTasks.filter((task) => task.status === "nova")
+
+  // Ordenar tarefas novas por prazo de vencimento (crescente)
+  const newTasks = activeTasks
+    .filter((task) => task.status === "nova")
+    .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+
   const inProgressTasks = activeTasks.filter((task) => task.status === "em_andamento")
   const completedTasks = activeTasks.filter((task) => task.status === "concluida")
 
@@ -275,6 +306,28 @@ export default function TasksPage() {
               <Button onClick={() => setIsTrashModalOpen(true)} variant="outline">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Lixeira
+              </Button>
+              {/* 5. Link para perfil do usuário */}
+              <Link href="/profile">
+                <Avatar className="h-8 w-8 cursor-pointer">
+                  <AvatarImage
+                    src={profile?.avatar_url || "/placeholder.svg?height=32&width=32"}
+                    alt={profile?.name || user?.email || ""}
+                  />
+                  <AvatarFallback>
+                    {profile?.name
+                      ? profile.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                      : user?.email?.[0]?.toUpperCase() || "U"}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+              {/* 4. Botão Sair */}
+              <Button variant="outline" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sair
               </Button>
             </div>
           </div>
@@ -446,9 +499,15 @@ export default function TasksPage() {
                       </div>
                     )}
                   </CardContent>
-                  <CardFooter className="pt-0">
-                    <Button size="sm" onClick={() => handleStatusChange(task.id, "concluida")} className="w-full">
+                  {/* 1. Botões "Concluir" e "Ver Detalhes" para tarefas em andamento */}
+                  <CardFooter className="pt-0 flex gap-2">
+                    <Button size="sm" onClick={() => handleStatusChange(task.id, "concluida")} className="flex-1">
+                      <Check className="h-4 w-4 mr-1" />
                       Concluir
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleViewDetails(task)} className="flex-1">
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ver Detalhes
                     </Button>
                   </CardFooter>
                 </Card>
@@ -538,6 +597,7 @@ export default function TasksPage() {
         onClose={() => setIsArchivedModalOpen(false)}
         tasks={tasks}
         onRestoreTask={(taskId) => handleStatusChange(taskId, "nova")}
+        onMoveToTrash={(taskId) => handleStatusChange(taskId, "lixeira")}
       />
 
       {/* Trash Tasks Modal */}
@@ -550,7 +610,24 @@ export default function TasksPage() {
           await deleteTask(taskId)
           await loadTasks()
         }}
+        onEmptyTrash={handleEmptyTrash}
       />
+
+      {/* Task Detail View */}
+      {selectedTask && (
+        <TaskDetailView
+          isOpen={isDetailViewOpen}
+          onClose={() => {
+            setIsDetailViewOpen(false)
+            setSelectedTask(null)
+          }}
+          task={selectedTask}
+          onUpdateTask={async (taskId, updates) => {
+            await updateTask(taskId, updates)
+            await loadTasks()
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>

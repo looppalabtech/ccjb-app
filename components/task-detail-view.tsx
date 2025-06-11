@@ -26,57 +26,88 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { ArrowLeft, Plus, Edit, Trash2, Calendar, Clock, AlertCircle, Check, Save, X } from "lucide-react"
-import type { Task, Note } from "@/types/task"
-import { format } from "date-fns"
+import { format, isValid } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
-interface TaskDetailViewProps {
-  task: Task
-  onClose: () => void
-  onUpdateTask: (task: Task) => void
-  currentUser: {
-    id: string
-    name: string
-    avatar?: string
-  }
+interface TaskUser {
+  id: string
+  name: string
+  email: string
+  avatar_url?: string
 }
 
-export default function TaskDetailView({ task, onClose, onUpdateTask, currentUser }: TaskDetailViewProps) {
-  const [notes, setNotes] = useState<Note[]>(task.notes)
+interface TaskNote {
+  id: string
+  content: string
+  created_at: string
+  user?: TaskUser
+}
+
+interface TaskDetailViewProps {
+  isOpen: boolean
+  onClose: () => void
+  task: {
+    id: string
+    titulo: string
+    descricao?: string
+    status: "nova" | "em_andamento" | "concluida" | "arquivada" | "lixeira"
+    priority: "low" | "medium" | "high"
+    due_date: string
+    created_at: string
+    assigned_user?: TaskUser | null
+    created_by_user?: TaskUser | null
+    notes?: TaskNote[]
+  }
+  onUpdateTask: (taskId: string, updates: any) => void
+}
+
+export default function TaskDetailView({ isOpen, onClose, task, onUpdateTask }: TaskDetailViewProps) {
+  const [notes, setNotes] = useState<TaskNote[]>(task.notes || [])
   const [newNote, setNewNote] = useState("")
-  const [editingNote, setEditingNote] = useState<Note | null>(null)
+  const [editingNote, setEditingNote] = useState<TaskNote | null>(null)
   const [editingContent, setEditingContent] = useState("")
   const [isAddingNote, setIsAddingNote] = useState(false)
-  const [noteToDelete, setNoteToDelete] = useState<Note | null>(null)
+  const [noteToDelete, setNoteToDelete] = useState<TaskNote | null>(null)
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
+    if (!isValid(date)) {
+      return "Data inválida"
+    }
     return format(date, "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })
   }
 
-  const getStatusIcon = (status: Task["status"]) => {
+  const formatSimpleDate = (dateString: string) => {
+    const date = new Date(dateString)
+    if (!isValid(date)) {
+      return "Data inválida"
+    }
+    return format(date, "dd/MM/yyyy")
+  }
+
+  const getStatusIcon = (status: string) => {
     switch (status) {
-      case "completed":
+      case "concluida":
         return <Check className="h-4 w-4" />
-      case "in-progress":
+      case "em_andamento":
         return <Clock className="h-4 w-4" />
       default:
         return <AlertCircle className="h-4 w-4" />
     }
   }
 
-  const getStatusColor = (status: Task["status"]) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case "completed":
+      case "concluida":
         return "bg-green-100 text-green-800"
-      case "in-progress":
+      case "em_andamento":
         return "bg-blue-100 text-blue-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
-  const getPriorityColor = (priority: Task["priority"]) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case "high":
         return "bg-red-100 text-red-800"
@@ -87,18 +118,18 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
     }
   }
 
-  const getStatusText = (status: Task["status"]) => {
+  const getStatusText = (status: string) => {
     switch (status) {
-      case "completed":
+      case "concluida":
         return "Concluída"
-      case "in-progress":
+      case "em_andamento":
         return "Em Andamento"
       default:
-        return "A Fazer"
+        return "Nova"
     }
   }
 
-  const getPriorityText = (priority: Task["priority"]) => {
+  const getPriorityText = (priority: string) => {
     switch (priority) {
       case "high":
         return "Alta"
@@ -111,11 +142,15 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
 
   const handleAddNote = () => {
     if (newNote.trim()) {
-      const note: Note = {
+      const note: TaskNote = {
         id: `n${Date.now()}`,
         content: newNote.trim(),
-        createdAt: new Date().toISOString(),
-        user: currentUser,
+        created_at: new Date().toISOString(),
+        user: {
+          id: "current-user",
+          name: "Usuário Atual",
+          email: "user@example.com",
+        },
       }
       const updatedNotes = [...notes, note]
       setNotes(updatedNotes)
@@ -123,12 +158,11 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
       setIsAddingNote(false)
 
       // Atualizar a tarefa
-      const updatedTask = { ...task, notes: updatedNotes }
-      onUpdateTask(updatedTask)
+      onUpdateTask(task.id, { notes: updatedNotes })
     }
   }
 
-  const handleEditNote = (note: Note) => {
+  const handleEditNote = (note: TaskNote) => {
     setEditingNote(note)
     setEditingContent(note.content)
   }
@@ -143,8 +177,7 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
       setEditingContent("")
 
       // Atualizar a tarefa
-      const updatedTask = { ...task, notes: updatedNotes }
-      onUpdateTask(updatedTask)
+      onUpdateTask(task.id, { notes: updatedNotes })
     }
   }
 
@@ -153,7 +186,7 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
     setEditingContent("")
   }
 
-  const handleDeleteNote = (note: Note) => {
+  const handleDeleteNote = (note: TaskNote) => {
     setNoteToDelete(note)
   }
 
@@ -164,13 +197,14 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
       setNoteToDelete(null)
 
       // Atualizar a tarefa
-      const updatedTask = { ...task, notes: updatedNotes }
-      onUpdateTask(updatedTask)
+      onUpdateTask(task.id, { notes: updatedNotes })
     }
   }
 
+  if (!isOpen) return null
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="fixed inset-0 z-50 bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -193,8 +227,8 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
-                    <CardTitle className="text-2xl">{task.title}</CardTitle>
-                    <CardDescription className="text-base">{task.description}</CardDescription>
+                    <CardTitle className="text-2xl">{task.titulo}</CardTitle>
+                    {task.descricao && <CardDescription className="text-base">{task.descricao}</CardDescription>}
                   </div>
                 </div>
                 <div className="flex items-center space-x-4 pt-4">
@@ -211,13 +245,35 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center text-gray-600">
                     <Calendar className="h-4 w-4 mr-2" />
-                    <span>Prazo: {format(new Date(task.dueDate), "dd/MM/yyyy")}</span>
+                    <span>Prazo: {formatSimpleDate(task.due_date)}</span>
                   </div>
                   <div className="flex items-center text-gray-600">
                     <Clock className="h-4 w-4 mr-2" />
-                    <span>Criada em: {format(new Date(task.createdAt), "dd/MM/yyyy")}</span>
+                    <span>Criada em: {formatSimpleDate(task.created_at)}</span>
                   </div>
                 </div>
+                {task.assigned_user && (
+                  <div className="mt-4">
+                    <div className="flex items-center">
+                      <Avatar className="h-8 w-8 mr-3">
+                        <AvatarImage
+                          src={task.assigned_user.avatar_url || "/placeholder.svg"}
+                          alt={task.assigned_user.name}
+                        />
+                        <AvatarFallback>
+                          {task.assigned_user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-medium">{task.assigned_user.name}</p>
+                        <p className="text-xs text-gray-500">{task.assigned_user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -300,35 +356,34 @@ export default function TaskDetailView({ task, onClose, onUpdateTask, currentUse
                             <div>
                               <div className="flex items-center mb-2">
                                 <Avatar className="h-6 w-6 mr-2">
-                                  <AvatarImage src={note.user?.avatar || "/placeholder.svg"} alt={note.user?.name} />
+                                  <AvatarImage
+                                    src={note.user?.avatar_url || "/placeholder.svg"}
+                                    alt={note.user?.name}
+                                  />
                                   <AvatarFallback>
                                     {note.user?.name
-                                      .split(" ")
+                                      ?.split(" ")
                                       .map((n) => n[0])
-                                      .join("")}
+                                      .join("") || "U"}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="text-sm font-medium">{note.user?.name}</span>
+                                <span className="text-sm font-medium">{note.user?.name || "Usuário"}</span>
                               </div>
                               <p className="text-sm mb-3 whitespace-pre-wrap">{note.content}</p>
                               <div className="flex items-center justify-between">
-                                <p className="text-xs text-gray-500">{formatDate(note.createdAt)}</p>
+                                <p className="text-xs text-gray-500">{formatDate(note.created_at)}</p>
                                 <div className="flex items-center space-x-1">
-                                  {note.user?.id === currentUser.id && (
-                                    <>
-                                      <Button size="sm" variant="ghost" onClick={() => handleEditNote(note)}>
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => handleDeleteNote(note)}
-                                        className="text-red-600 hover:text-red-700"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </>
-                                  )}
+                                  <Button size="sm" variant="ghost" onClick={() => handleEditNote(note)}>
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteNote(note)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
                                 </div>
                               </div>
                             </div>

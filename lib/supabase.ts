@@ -828,6 +828,16 @@ export const createTask = async (taskData: {
       return { data: null, error: insertError }
     }
 
+    // 2. Criar notificação se a tarefa foi atribuída a outro usuário
+    if (taskData.assigned_to && taskData.assigned_to !== session.user.id) {
+      await createNotification({
+        user_id: taskData.assigned_to,
+        task_id: newTask.id,
+        title: "Nova tarefa atribuída",
+        message: `Você recebeu uma nova tarefa: ${taskData.titulo}`,
+      })
+    }
+
     // Buscar dados do usuário atribuído
     const { data: assignedUser } = await supabase
       .from("users")
@@ -921,11 +931,13 @@ export const deleteTask = async (id: string) => {
   }
 }
 
+// 1. Buscar apenas usuários com role 'user'
 export const getUsers = async () => {
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, email, avatar_url")
+      .select("id, name, email, avatar_url, role")
+      .eq("role", "user")
       .order("name", { ascending: true })
 
     return { data, error }
@@ -935,18 +947,44 @@ export const getUsers = async () => {
   }
 }
 
-// Substituir as funções de notificação para não usar a coluna 'read' que não existe
-
 // ===== FUNÇÕES PARA NOTIFICAÇÕES =====
 
+// 2. Criar notificação
+export const createNotification = async (notificationData: {
+  user_id: string
+  task_id: string
+  title: string
+  message: string
+}) => {
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .insert({
+        user_id: notificationData.user_id,
+        task_id: notificationData.task_id,
+        title: notificationData.title,
+        message: notificationData.message,
+        read: false,
+      })
+      .select()
+      .single()
+
+    return { data, error }
+  } catch (error) {
+    console.error("Erro inesperado ao criar notificação:", error)
+    return { data: null, error }
+  }
+}
+
+// 2. Buscar notificações não lidas
 export const getUnreadNotifications = async (userId: string) => {
   try {
     const { data, error } = await supabase
-      .from("tasks")
-      .select("id, titulo, created_at")
-      .eq("assigned_to", userId)
-      .neq("created_by", userId)
-      .not("status", "in", '("concluida","lixeira")')
+      .from("notifications")
+      .select("id, title, message, created_at, task_id")
+      .eq("user_id", userId)
+      .eq("read", false)
+      .order("created_at", { ascending: false })
 
     return { data, error }
   } catch (error) {
@@ -955,11 +993,11 @@ export const getUnreadNotifications = async (userId: string) => {
   }
 }
 
-export const markNotificationAsRead = async (taskId: string) => {
+export const markNotificationAsRead = async (notificationId: string) => {
   try {
-    // Como não temos coluna 'read', vamos apenas retornar sucesso
-    // A notificação será considerada "lida" quando o usuário visualizar
-    return { error: null }
+    const { error } = await supabase.from("notifications").update({ read: true }).eq("id", notificationId)
+
+    return { error }
   } catch (error) {
     console.error("Erro inesperado ao marcar notificação como lida:", error)
     return { error }
@@ -969,50 +1007,45 @@ export const markNotificationAsRead = async (taskId: string) => {
 export const getNotifications = async (userId: string) => {
   try {
     const { data, error } = await supabase
-      .from("tasks")
+      .from("notifications")
       .select(`
         id,
-        titulo,
-        descricao,
+        title,
+        message,
+        read,
         created_at,
-        created_by,
-        users!tasks_created_by_fkey(id, name, email, avatar_url)
+        task_id,
+        tasks!notifications_task_id_fkey(titulo, status)
       `)
-      .eq("assigned_to", userId)
-      .neq("created_by", userId)
-      .not("status", "in", '("concluida","lixeira")')
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
 
-    if (error) {
-      console.error("Erro ao buscar notificações:", error)
-      return { data: null, error }
-    }
-
-    // Transformar os dados para o formato esperado
-    const transformedData =
-      data?.map((task) => ({
-        id: task.id,
-        titulo: task.titulo,
-        descricao: task.descricao,
-        created_at: task.created_at,
-        read: false, // Sempre false já que não temos essa coluna
-        created_by_user: task.users,
-      })) || []
-
-    return { data: transformedData, error: null }
+    return { data, error }
   } catch (error) {
     console.error("Erro inesperado ao buscar notificações:", error)
     return { data: null, error }
   }
 }
 
-export const deleteNotification = async (taskId: string) => {
+export const deleteNotification = async (notificationId: string) => {
   try {
-    const { error } = await supabase.from("tasks").update({ status: "lixeira" }).eq("id", taskId)
+    const { error } = await supabase.from("notifications").delete().eq("id", notificationId)
 
     return { error }
   } catch (error) {
     console.error("Erro inesperado ao deletar notificação:", error)
+    return { error }
+  }
+}
+
+// 3. Função para esvaziar lixeira
+export const emptyTrash = async () => {
+  try {
+    const { error } = await supabase.from("tasks").delete().eq("status", "lixeira")
+
+    return { error }
+  } catch (error) {
+    console.error("Erro inesperado ao esvaziar lixeira:", error)
     return { error }
   }
 }
