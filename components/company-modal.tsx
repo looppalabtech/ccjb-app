@@ -28,6 +28,7 @@ import {
   updateParecerFinal,
 } from "@/lib/supabase"
 import type { RepresentanteLegal } from "@/types/representante-legal"
+import { Search } from "lucide-react"
 
 interface CompanyModalProps {
   isOpen: boolean
@@ -64,6 +65,7 @@ export default function CompanyModal({
   const [status, setStatus] = useState<Company["status"]>("todo")
   const [priority, setPriority] = useState<Company["priority"]>("medium")
   const [dueDate, setDueDate] = useState("")
+  const [isLoadingCnpj, setIsLoadingCnpj] = useState(false)
 
   // Estados para modais dos módulos
   const [isRepresentanteModalOpen, setIsRepresentanteModalOpen] = useState(false)
@@ -102,6 +104,72 @@ export default function CompanyModal({
       setDueDate("")
     }
   }, [company, isOpen])
+
+  const consultarCNPJ = async () => {
+    if (!cnpj.trim()) {
+      alert("Digite um CNPJ válido")
+      return
+    }
+
+    // Remove formatação do CNPJ (pontos, barras, hífens)
+    const cnpjLimpo = cnpj.replace(/[^\d]/g, "")
+
+    if (cnpjLimpo.length !== 14) {
+      alert("CNPJ deve ter 14 dígitos")
+      return
+    }
+
+    setIsLoadingCnpj(true)
+
+    try {
+      const response = await fetch(`https://open.cnpja.com/office/${cnpjLimpo}`)
+
+      if (!response.ok) {
+        throw new Error("Erro na consulta do CNPJ")
+      }
+
+      const data = await response.json()
+
+      // Mapear os dados da API para os campos do formulário
+      if (data.founded) {
+        // Converter data de yyyy-mm-dd para dd/mm/yyyy se necessário
+        const dataFounded = new Date(data.founded)
+        const dataFormatada = dataFounded.toISOString().split("T")[0]
+        setAbertura(dataFormatada)
+      }
+
+      if (data.company?.name) {
+        setNomeEmpresa(data.company.name)
+      }
+
+      if (data.address?.state) {
+        setEstado(data.address.state)
+      }
+
+      if (data.address?.city) {
+        setCidade(data.address.city)
+      }
+
+      if (data.address?.street) {
+        setEndereco(`${data.address.street}, ${data.address.number}, ${data.address.district}. CEP: ${data.address.zip}`)
+      }
+
+      if (data.mainActivity?.id && data.mainActivity?.text) {
+        setCnae(`${data.mainActivity.id} - ${data.mainActivity.text}`)
+      }
+
+      if (data.emails && data.emails.length > 0 && data.emails[0].address) {
+        setEmail(data.emails[0].address)
+      }
+
+      alert("Dados coletados. Confirme no formulário!")
+    } catch (error) {
+      console.error("Erro ao consultar CNPJ:", error)
+      alert("Erro ao consultar CNPJ. Verifique o número e tente novamente.")
+    } finally {
+      setIsLoadingCnpj(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -264,7 +332,7 @@ export default function CompanyModal({
       // Recarregar dados da empresa
       window.location.reload()
     } catch (error) {
-      console.error("Erro inesperado ao atualizar parecer final:", error)
+      console.error("Erro inesperado ao criar parecer final:", error)
       alert("Erro inesperado ao criar parecer final.")
     }
   }
@@ -296,13 +364,26 @@ export default function CompanyModal({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="cnpj">CNPJ *</Label>
-                        <Input
-                          id="cnpj"
-                          value={cnpj}
-                          onChange={(e) => setCnpj(e.target.value)}
-                          placeholder="00.000.000/0000-00"
-                          required
-                        />
+                        <div className="flex gap-2">
+                          <Input
+                            id="cnpj"
+                            value={cnpj}
+                            onChange={(e) => setCnpj(e.target.value)}
+                            placeholder="00.000.000/0000-00"
+                            required
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={consultarCNPJ}
+                            disabled={isLoadingCnpj}
+                            title="Consultar CNPJ"
+                          >
+                            <Search className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="porte">Porte *</Label>
@@ -523,13 +604,26 @@ export default function CompanyModal({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="cnpj">CNPJ *</Label>
-                    <Input
-                      id="cnpj"
-                      value={cnpj}
-                      onChange={(e) => setCnpj(e.target.value)}
-                      placeholder="00.000.000/0000-00"
-                      required
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="cnpj"
+                        value={cnpj}
+                        onChange={(e) => setCnpj(e.target.value)}
+                        placeholder="00.000.000/0000-00"
+                        required
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={consultarCNPJ}
+                        disabled={isLoadingCnpj}
+                        title="Consultar CNPJ"
+                      >
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="porte">Porte *</Label>
