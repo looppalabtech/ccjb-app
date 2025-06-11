@@ -151,7 +151,9 @@ export default function CompanyModal({
       }
 
       if (data.address?.street) {
-        setEndereco(`${data.address.street}, ${data.address.number}, ${data.address.district}. CEP: ${data.address.zip}`)
+        setEndereco(
+          `${data.address.street}, ${data.address.number}, ${data.address.district}. CEP: ${data.address.zip}`,
+        )
       }
 
       if (data.mainActivity?.id && data.mainActivity?.text) {
@@ -781,6 +783,18 @@ export default function CompanyModal({
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                window.open(
+                  "https://solucoes.receita.fazenda.gov.br/servicos/cnpjreva/Cnpjreva_Solicitacao.asp",
+                  "_blank",
+                )
+              }
+            >
+              Cartão CNPJ
             </Button>
             {company ? (
               <Button type="submit" form="company-form">

@@ -709,6 +709,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        <div className="mt-5 itens-center">
+          <p>&copy; 2025 - Looppa Lab Tech. Todos os direitos reservados.</p>
+        </div>
       </main>
 
       {/* Company Modal */}
