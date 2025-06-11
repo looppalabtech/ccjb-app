@@ -828,7 +828,7 @@ export const createTask = async (taskData: {
       return { data: null, error: insertError }
     }
 
-    // 2. Criar notificação se a tarefa foi atribuída a outro usuário
+    // Criar notificação se a tarefa foi atribuída a outro usuário
     if (taskData.assigned_to && taskData.assigned_to !== session.user.id) {
       await createNotification({
         user_id: taskData.assigned_to,
@@ -931,25 +931,76 @@ export const deleteTask = async (id: string) => {
   }
 }
 
-// 1. Buscar apenas usuários com role 'user'
+// Buscar usuários com fallback para tabela users se user_task_notify não existir
 export const getUsers = async () => {
   try {
-    const { data, error } = await supabase
+    // Tentar buscar da tabela user_task_notify primeiro
+    const { data: taskNotifyData, error: taskNotifyError } = await supabase
+      .from("user_task_notify")
+      .select("uid as id, name, email, role")
+      .order("name", { ascending: true })
+
+    // Se a tabela user_task_notify existir e não houver erro, usar ela
+    if (!taskNotifyError && taskNotifyData) {
+      return { data: taskNotifyData, error: null }
+    }
+
+    // Fallback: usar tabela users com filtro por role
+    console.log("Tabela user_task_notify não encontrada, usando fallback para tabela users")
+    const { data: usersData, error: usersError } = await supabase
       .from("users")
-      .select("id, name, email, avatar_url, role")
+      .select("id, name, email, role")
       .eq("role", "user")
       .order("name", { ascending: true })
 
-    return { data, error }
+    if (usersError) {
+      // Se também falhar na tabela users, tentar sem filtro de role
+      console.log("Erro ao filtrar por role, buscando todos os usuários")
+      const { data: allUsersData, error: allUsersError } = await supabase
+        .from("users")
+        .select("id, name, email")
+        .order("name", { ascending: true })
+
+      return { data: allUsersData, error: allUsersError }
+    }
+
+    return { data: usersData, error: null }
   } catch (error) {
     console.error("Erro inesperado ao buscar usuários:", error)
     return { data: null, error }
   }
 }
 
+// Função para sincronizar usuário na tabela user_task_notify
+export const syncUserTaskNotify = async (userData: {
+  uid: string
+  name: string
+  email: string
+  role: string
+}) => {
+  try {
+    const { data, error } = await supabase
+      .from("user_task_notify")
+      .upsert({
+        uid: userData.uid,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single()
+
+    return { data, error }
+  } catch (error) {
+    console.error("Erro inesperado ao sincronizar usuário:", error)
+    return { data: null, error }
+  }
+}
+
 // ===== FUNÇÕES PARA NOTIFICAÇÕES =====
 
-// 2. Criar notificação
+// Criar notificação
 export const createNotification = async (notificationData: {
   user_id: string
   task_id: string
@@ -976,7 +1027,7 @@ export const createNotification = async (notificationData: {
   }
 }
 
-// 2. Buscar notificações não lidas
+// Buscar notificações não lidas
 export const getUnreadNotifications = async (userId: string) => {
   try {
     const { data, error } = await supabase
@@ -1038,7 +1089,7 @@ export const deleteNotification = async (notificationId: string) => {
   }
 }
 
-// 3. Função para esvaziar lixeira
+// Função para esvaziar lixeira
 export const emptyTrash = async () => {
   try {
     const { error } = await supabase.from("tasks").delete().eq("status", "lixeira")

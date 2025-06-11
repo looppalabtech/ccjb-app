@@ -428,7 +428,7 @@ export default function Dashboard() {
                 Sair
               </Button>
               <div className="flex items-center ml-4 pl-4 border-l border-gray-200">
-                <Avatar className="h-8 w-8 mr-3">
+                <Avatar className="h-8 w-8 mr-3 cursor-pointer" onClick={() => router.push("/profile")}>
                   <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
                   <AvatarFallback>
                     {currentUser.name
@@ -724,11 +724,11 @@ export default function Dashboard() {
         currentUser={currentUser}
       />
 
-      {/* Archived Companies Modal */}
+      {/* Archived Companies Modal - CORREÇÃO AQUI */}
       <ArchivedCompanies
         isOpen={isArchivedModalOpen}
         onClose={() => setIsArchivedModalOpen(false)}
-        companies={companies}
+        companies={companies} // Passando o array companies corretamente
         onRestoreCompany={handleRestoreCompany}
         onViewCompany={openCompanyDetail}
       />

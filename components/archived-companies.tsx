@@ -13,7 +13,7 @@ import type { Company } from "@/types/task"
 interface ArchivedCompaniesProps {
   isOpen: boolean
   onClose: () => void
-  companies: Company[]
+  companies?: Company[]
   onRestoreCompany: (companyId: string) => void
   onViewCompany: (company: Company) => void
 }
@@ -21,13 +21,13 @@ interface ArchivedCompaniesProps {
 export default function ArchivedCompanies({
   isOpen,
   onClose,
-  companies,
+  companies = [],
   onRestoreCompany,
   onViewCompany,
 }: ArchivedCompaniesProps) {
   const [searchTerm, setSearchTerm] = useState("")
 
-  const archivedCompanies = companies.filter((company) => company.archived)
+  const archivedCompanies = (companies || []).filter((company) => company.archived)
 
   const filteredCompanies = archivedCompanies.filter(
     (company) =>

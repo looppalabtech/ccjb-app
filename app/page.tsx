@@ -4,76 +4,66 @@ import type React from "react"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Building2 } from "lucide-react"
-import Dashboard from "@/components/dashboard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Building2, LogIn } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import Dashboard from "@/components/dashboard"
 
-export default function Home() {
-  const { user, loading, signIn } = useAuth()
+export default function LoginPage() {
+  const { user, signIn, loading } = useAuth()
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // Se o usuário já está logado, mostrar o dashboard
+  if (user) {
+    return <Dashboard />
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (email && password) {
-      setIsLoading(true)
-      setError("")
+    setIsLoading(true)
+    setError("")
 
-      try {
-        const { error } = await signIn(email, password)
+    try {
+      const { error } = await signIn(email, password)
 
-        if (error) {
-          // Mensagens de erro mais específicas
-          if (error.message.includes("Invalid login credentials")) {
-            setError("Email ou senha incorretos. Verifique suas credenciais.")
-          } else if (error.message.includes("Email not confirmed")) {
-            setError("Email não confirmado. Verifique sua caixa de entrada.")
-          } else if (error.message.includes("Too many requests")) {
-            setError("Muitas tentativas de login. Tente novamente em alguns minutos.")
-          } else {
-            setError("Erro ao fazer login. Verifique suas credenciais.")
-          }
-        }
-      } catch (err) {
-        setError("Erro ao fazer login. Tente novamente.")
-      } finally {
-        setIsLoading(false)
+      if (error) {
+        setError("Email ou senha incorretos")
+        return
       }
+
+      // O redirecionamento será feito automaticamente pelo AuthContext
+    } catch (error) {
+      setError("Erro inesperado. Tente novamente.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  // Mostrar loading enquanto verifica autenticação
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando...</p>
         </div>
       </div>
     )
   }
 
-  // Se usuário está logado, mostrar dashboard
-  if (user) {
-    return <Dashboard />
-  }
-
-  // Mostrar tela de login
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Building2 className="h-12 w-12 text-blue-600 mr-3" />
-            <h1 className="text-3xl font-bold text-gray-900">CCJB Compliance</h1>
-          </div>
-          <p className="text-gray-600 mt-2">Background Check Empresarial</p>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <Building2 className="mx-auto h-12 w-12 text-blue-600" />
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">CCJB Compliance</h2>
+          <p className="mt-2 text-sm text-gray-600">Sistema de Background Check Empresarial</p>
         </div>
 
         <Card>
@@ -82,41 +72,45 @@ export default function Home() {
             <CardDescription>Digite suas credenciais para acessar o sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {error && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">{error}</div>
-              )}
-
-              <div className="space-y-2">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="Digite seu email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  disabled={isLoading}
+                  className="mt-1"
+                  placeholder="seu@email.com"
                 />
               </div>
 
-              <div className="space-y-2">
+              <div>
                 <Label htmlFor="password">Senha</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  className="mt-1"
+                  placeholder="••••••••"
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Entrando..." : "Entrar"}
-              </Button>
-              <p className="flex itens-center">&copy; 2025 - Looppa Lab Tech</p>
+              {error && <div className="text-red-600 text-sm text-center">{error}</div>}
+
+              <div className="flex justify-center">
+                <Button type="submit" disabled={isLoading} className="w-full">
+                  {isLoading ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <LogIn className="h-4 w-4 mr-2" />
+                  )}
+                  {isLoading ? "Entrando..." : "Entrar"}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>
