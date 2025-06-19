@@ -60,7 +60,13 @@ import RepresentanteLegalModal from "@/components/representante-legal-modal"
 import RepresentanteLegalDetailView from "@/components/representante-legal-detail-view"
 
 // Importe a função createRepresentanteLegal
-import { createRepresentanteLegal, updateRepresentanteLegal } from "@/lib/supabase"
+import {
+  createRepresentanteLegal,
+  updateRepresentanteLegal,
+  createFlow,
+  createNote,
+  createParecerFinal,
+} from "@/lib/supabase"
 
 interface CompanyDetailViewProps {
   company: Company
@@ -105,8 +111,18 @@ export default function CompanyDetailView({ company, onClose, onUpdateCompany, c
   const [newParecerOrientacao, setNewParecerOrientacao] = useState<ParecerFinal["orientacao"]>("Aprovar")
   const [newParecerTexto, setNewParecerTexto] = useState("")
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) {
+      return "Data não informada"
+    }
+
     const date = new Date(dateString)
+
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      return "Data inválida"
+    }
+
     return new Intl.DateTimeFormat("pt-BR", {
       day: "2-digit",
       month: "long",
@@ -270,24 +286,44 @@ export default function CompanyDetailView({ company, onClose, onUpdateCompany, c
     }
   }
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (newNote.trim()) {
-      const note: Note = {
-        id: `n${Date.now()}`,
-        tipo: newNoteTipo,
-        content: newNote.trim(),
-        createdAt: new Date().toISOString(),
-        user: currentUser,
-      }
-      const updatedNotes = [...notes, note]
-      setNotes(updatedNotes)
-      setNewNote("")
-      setNewNoteTipo("Alerta Normal")
-      setIsAddingNote(false)
+      try {
+        const { data: noteData, error } = await createNote({
+          company_id: company.id,
+          tipo: newNoteTipo,
+          content: newNote.trim(),
+        })
 
-      // Atualizar a empresa
-      const updatedCompany = { ...company, notes: updatedNotes }
-      onUpdateCompany(updatedCompany)
+        if (error) {
+          console.error("Erro ao criar nota:", error)
+          alert("Erro ao criar nota. Por favor, tente novamente.")
+          return
+        }
+
+        if (noteData) {
+          const note: Note = {
+            id: noteData.id,
+            tipo: noteData.tipo as Note["tipo"],
+            content: noteData.content,
+            createdAt: noteData.created_at,
+            user: noteData.user || currentUser,
+          }
+
+          const updatedNotes = [...notes, note]
+          setNotes(updatedNotes)
+          setNewNote("")
+          setNewNoteTipo("Alerta Normal")
+          setIsAddingNote(false)
+
+          // Atualizar a empresa
+          const updatedCompany = { ...company, notes: updatedNotes }
+          onUpdateCompany(updatedCompany)
+        }
+      } catch (error) {
+        console.error("Erro inesperado ao criar nota:", error)
+        alert("Ocorreu um erro inesperado. Por favor, tente novamente.")
+      }
     }
   }
 
@@ -335,24 +371,45 @@ export default function CompanyDetailView({ company, onClose, onUpdateCompany, c
     }
   }
 
-  const handleAddFlow = () => {
+  const handleAddFlow = async () => {
     if (observacao.trim()) {
-      const flow: Flow = {
-        id: `f${Date.now()}`,
-        nomeFluxo,
-        checkFluxo,
-        observacao: observacao.trim(),
-        createdAt: new Date().toISOString(),
-        user: currentUser,
-      }
-      const updatedFlows = [...flows, flow]
-      setFlows(updatedFlows)
-      setObservacao("")
-      setIsAddingFlow(false)
+      try {
+        const { data: flowData, error } = await createFlow({
+          company_id: company.id,
+          nome_fluxo: nomeFluxo,
+          check_fluxo: checkFluxo,
+          observacao: observacao.trim(),
+        })
 
-      // Atualizar a empresa
-      const updatedCompany = { ...company, flows: updatedFlows }
-      onUpdateCompany(updatedCompany)
+        if (error) {
+          console.error("Erro ao criar fluxo:", error)
+          alert("Erro ao criar fluxo. Por favor, tente novamente.")
+          return
+        }
+
+        if (flowData) {
+          const flow: Flow = {
+            id: flowData.id,
+            nomeFluxo: flowData.nome_fluxo as Flow["nomeFluxo"],
+            checkFluxo: flowData.check_fluxo as Flow["checkFluxo"],
+            observacao: flowData.observacao,
+            createdAt: flowData.created_at,
+            user: flowData.user || currentUser,
+          }
+
+          const updatedFlows = [...flows, flow]
+          setFlows(updatedFlows)
+          setObservacao("")
+          setIsAddingFlow(false)
+
+          // Atualizar a empresa
+          const updatedCompany = { ...company, flows: updatedFlows }
+          onUpdateCompany(updatedCompany)
+        }
+      } catch (error) {
+        console.error("Erro inesperado ao criar fluxo:", error)
+        alert("Ocorreu um erro inesperado. Por favor, tente novamente.")
+      }
     }
   }
 
@@ -411,25 +468,46 @@ export default function CompanyDetailView({ company, onClose, onUpdateCompany, c
   }
 
   // Funções para parecer final
-  const handleAddParecer = () => {
+  const handleAddParecer = async () => {
     if (newParecerTexto.trim()) {
-      const parecer: ParecerFinal = {
-        id: `p${Date.now()}`,
-        risco: newParecerRisco,
-        orientacao: newParecerOrientacao,
-        parecer: newParecerTexto.trim(),
-        createdAt: new Date().toISOString(),
-        user: currentUser,
-      }
-      setParecerFinal(parecer)
-      setNewParecerTexto("")
-      setNewParecerRisco("Baixo")
-      setNewParecerOrientacao("Aprovar")
-      setIsAddingParecer(false)
+      try {
+        const { data: parecerData, error } = await createParecerFinal({
+          company_id: company.id,
+          risco: newParecerRisco,
+          orientacao: newParecerOrientacao,
+          parecer: newParecerTexto.trim(),
+        })
 
-      // Atualizar a empresa
-      const updatedCompany = { ...company, parecerFinal: parecer }
-      onUpdateCompany(updatedCompany)
+        if (error) {
+          console.error("Erro ao criar parecer:", error)
+          alert("Erro ao criar parecer. Por favor, tente novamente.")
+          return
+        }
+
+        if (parecerData) {
+          const parecer: ParecerFinal = {
+            id: parecerData.id,
+            risco: parecerData.risco as ParecerFinal["risco"],
+            orientacao: parecerData.orientacao as ParecerFinal["orientacao"],
+            parecer: parecerData.parecer,
+            createdAt: parecerData.created_at,
+            user: parecerData.user || currentUser,
+          }
+
+          setParecerFinal(parecer)
+          setNewParecerTexto("")
+          setNewParecerRisco("Baixo")
+          setNewParecerOrientacao("Aprovar")
+          setIsAddingParecer(false)
+
+          // Atualizar a empresa
+          const updatedCompany = { ...company, parecerFinal: parecer }
+          onUpdateCompany(updatedCompany)
+        }
+      } catch (error) {
+        console.error("Erro inesperado ao criar parecer:", error)
+        alert("Ocorreu um erro inesperado. Por favor, tente novamente.")
+      }
     }
   }
 

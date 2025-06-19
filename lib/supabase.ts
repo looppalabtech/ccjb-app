@@ -879,10 +879,20 @@ export const updateTask = async (
   },
 ) => {
   try {
-    // Atualizar a tarefa
+    // Filtrar apenas os campos válidos da tabela tasks
+    const validUpdates: any = {}
+
+    if (updates.titulo !== undefined) validUpdates.titulo = updates.titulo
+    if (updates.descricao !== undefined) validUpdates.descricao = updates.descricao
+    if (updates.status !== undefined) validUpdates.status = updates.status
+    if (updates.priority !== undefined) validUpdates.priority = updates.priority
+    if (updates.due_date !== undefined) validUpdates.due_date = updates.due_date
+    if (updates.assigned_to !== undefined) validUpdates.assigned_to = updates.assigned_to
+
+    // Atualizar a tarefa apenas com campos válidos
     const { data: updatedTask, error: updateError } = await supabase
       .from("tasks")
-      .update(updates)
+      .update(validUpdates)
       .eq("id", id)
       .select()
       .single()
@@ -892,26 +902,40 @@ export const updateTask = async (
       return { data: null, error: updateError }
     }
 
-    // Buscar dados do usuário atribuído
-    const { data: assignedUser } = await supabase
-      .from("users")
-      .select("id, name, email, avatar_url")
-      .eq("id", updatedTask.assigned_to)
-      .single()
+    // Buscar dados do usuário atribuído apenas se assigned_to não for null
+    let assignedUser = null
+    if (updatedTask.assigned_to) {
+      const { data: assignedUserData, error: assignedUserError } = await supabase
+        .from("users")
+        .select("id, name, email, avatar_url")
+        .eq("id", updatedTask.assigned_to)
+        .single()
 
-    // Buscar dados do usuário que criou
-    const { data: createdByUser } = await supabase
-      .from("users")
-      .select("id, name, email, avatar_url")
-      .eq("id", updatedTask.created_by)
-      .single()
+      if (!assignedUserError) {
+        assignedUser = assignedUserData
+      }
+    }
+
+    // Buscar dados do usuário que criou apenas se created_by não for null
+    let createdByUser = null
+    if (updatedTask.created_by) {
+      const { data: createdByUserData, error: createdByUserError } = await supabase
+        .from("users")
+        .select("id, name, email, avatar_url")
+        .eq("id", updatedTask.created_by)
+        .single()
+
+      if (!createdByUserError) {
+        createdByUser = createdByUserData
+      }
+    }
 
     // Retornar a tarefa com os dados de usuário
     return {
       data: {
         ...updatedTask,
-        assigned_user: assignedUser || null,
-        created_by_user: createdByUser || null,
+        assigned_user: assignedUser,
+        created_by_user: createdByUser,
       },
       error: null,
     }

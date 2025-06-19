@@ -370,17 +370,6 @@ export default function Dashboard() {
         avatar: "/placeholder.svg?height=32&width=32",
       }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Carregando empresas...</p>
-        </div>
-      </div>
-    )
-  }
-
   if (viewingCompany) {
     return (
       <CompanyDetailView
@@ -407,14 +396,17 @@ export default function Dashboard() {
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Empresa
               </Button>
+
               <Button onClick={() => setIsArchivedModalOpen(true)}>
                 <Archive className="h-4 w-4 mr-2" />
                 Arquivadas
               </Button>
+
               <Button onClick={() => router.push("/tasks")} className="bg-green-600 hover:bg-green-700">
                 <CheckSquare className="h-4 w-4 mr-2" />
                 Tarefas
               </Button>
+
               <Button onClick={() => router.push("/notifications")} variant="outline" size="icon" className="relative">
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
@@ -423,10 +415,12 @@ export default function Dashboard() {
                   </span>
                 )}
               </Button>
+
               <Button variant="outline" onClick={signOut}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Sair
               </Button>
+
               <div className="flex items-center ml-4 pl-4 border-l border-gray-200">
                 <Avatar className="h-8 w-8 mr-3 cursor-pointer" onClick={() => router.push("/profile")}>
                   <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />

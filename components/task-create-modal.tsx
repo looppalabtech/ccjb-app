@@ -125,7 +125,6 @@ export default function TaskCreateModal({ isOpen, onClose, onSubmit, users }: Ta
                   <SelectValue placeholder="Selecione um usuário (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Não atribuir</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name} ({user.email})
